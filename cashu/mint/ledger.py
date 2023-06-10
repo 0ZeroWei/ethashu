@@ -3,6 +3,9 @@ from typing import Dict, List, Literal, Optional, Set, Union
 
 from loguru import logger
 
+from web3 import Web3
+from web3.middleware import construct_sign_and_send_raw_middleware
+
 from ..core import bolt11, legacy
 from ..core.base import (
     BlindedMessage,
@@ -23,6 +26,12 @@ from ..core.split import amount_split
 from ..lightning.base import Wallet
 from ..mint.crud import LedgerCrud
 
+w3 = Web3(Web3.WebsocketProvider(f"wss://goerli.infura.io/ws/v3/{settings.infura}"))
+
+acc = w3.eth.account.from_key(settings.pk)
+w3.middleware_onion.add(construct_sign_and_send_raw_middleware(acc))
+
+w3.is_connected()
 
 class Ledger:
     def __init__(
@@ -701,34 +710,34 @@ class Ledger:
             logger.trace("verified proofs")
 
             total_provided = sum_proofs(proofs)
-            invoice_obj = bolt11.decode(invoice)
-            invoice_amount = math.ceil(invoice_obj.amount_msat / 1000)
-            if settings.mint_max_peg_out and invoice_amount > settings.mint_max_peg_out:
+
+            if settings.mint_max_peg_out and total_provided > settings.mint_max_peg_out:
                 raise Exception(
                     f"Maximum melt amount is {settings.mint_max_peg_out} sats."
                 )
-            fees_msat = await self.check_fees(invoice)
-            assert total_provided >= invoice_amount + fees_msat / 1000, Exception(
-                "provided proofs not enough for Lightning payment."
-            )
+            # fees_msat = await self.check_fees(invoice)
+            # assert total_provided >= invoice_amount + fees_msat / 1000, Exception(
+            #     "provided proofs not enough for Lightning payment."
+            # )
 
             # promises to return for overpaid fees
             return_promises: List[BlindedSignature] = []
 
-            if settings.lightning:
-                logger.trace("paying lightning invoice")
-                status, preimage, fee_msat = await self._pay_lightning_invoice(
-                    invoice, fees_msat
-                )
-                logger.trace("paid lightning invoice")
-            else:
-                status, preimage, fee_msat = True, "preimage", 0
+            hash = w3.eth.send_transaction({
+                "from": acc.address,
+                "value": total_provided,
+                "to": invoice
+            })
+            receipt = w3.eth.wait_for_transaction_receipt(hash)
+            logger.trace(receipt)
+
+            status, preimage, fee_msat = receipt.status, "preimage", 0
 
             logger.trace(
                 f"status: {status}, preimage: {preimage}, fee_msat: {fee_msat}"
             )
 
-            if status == True:
+            if status == 1:
                 logger.trace(f"invalidating proofs")
                 await self._invalidate_proofs(proofs)
                 logger.trace("invalidated proofs")
@@ -737,13 +746,13 @@ class Ledger:
                 if outputs:
                     return_promises = await self._generate_change_promises(
                         total_provided=total_provided,
-                        invoice_amount=invoice_amount,
+                        invoice_amount=total_provided,
                         ln_fee_msat=fee_msat,
                         outputs=outputs,
                     )
             else:
-                logger.trace("lightning payment unsuccessful")
-                raise Exception("Lightning payment unsuccessful.")
+                logger.trace("ether payment unsuccessful")
+                raise Exception("ether payment unsuccessful.")
 
         except Exception as e:
             logger.trace(f"exception: {e}")
