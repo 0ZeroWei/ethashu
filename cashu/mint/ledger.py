@@ -609,17 +609,19 @@ class Ledger:
         if settings.mint_peg_out_only:
             raise Exception("Mint does not allow minting new tokens.")
 
+        ph = random_hash()
+        pr = f"{acc.address}:{ph}"
         invoice = Invoice(
             amount=amount,
             hash=random_hash(),
-            pr="",
-            payment_hash=random_hash(),  # what we got from the backend
+            pr=pr,
+            payment_hash=ph,  # what we got from the backend
             issued=False,
         )
         logger.trace(f"crud: storing invoice {invoice.hash} in db")
         await self.crud.store_lightning_invoice(invoice=invoice, db=self.db)
         logger.trace(f"crud: stored invoice {invoice.hash} in db")
-        return "", invoice.hash
+        return pr, invoice.hash
 
     async def mint(
         self,
