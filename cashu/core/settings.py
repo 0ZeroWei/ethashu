@@ -129,7 +129,7 @@ def startup_settings_tasks():
             # localhost without https
             settings.mint_url = f"http://{settings.mint_host}:{settings.mint_port}"
         else:
-            settings.mint_url = f"https://{settings.mint_host}:{settings.mint_port}"
+            settings.mint_url = f"http://{settings.mint_host}:{settings.mint_port}"
 
 
 startup_settings_tasks()
