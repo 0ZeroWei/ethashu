@@ -33,6 +33,32 @@ w3.middleware_onion.add(construct_sign_and_send_raw_middleware(acc))
 
 w3.is_connected()
 
+transfers = []
+
+def check_transfer(amount: int, hash: str) -> bool:
+    import requests
+    import base64
+    global transfers
+    decoded = f"0x{base64.urlsafe_b64decode(hash).hex().lower()}"
+    print(decoded)
+    url = f'https://api-goerli.etherscan.io/api?module=account&action=txlist&address={acc.address}&startblock=0&endblock=99999999&sort=desc&apikey=YourApiKeyToken'
+    headers = {
+        "accept": "application/json",
+        "content-type": "application/json"
+    }
+    response = requests.post(url, headers=headers)
+    if response.status_code == 200:
+        data = response.json()
+        transfers = data['result']
+        logger.trace(f"transfers list refreshed")
+    else:
+        logger.debug(f"Error: {response.status_code}")
+
+    for transfer in transfers:
+        if transfer['value'] == f"{amount}" and transfer['input'] == decoded:
+            return True
+    return False
+
 class Ledger:
     def __init__(
         self,
@@ -365,12 +391,13 @@ class Ledger:
             logger.trace(
                 f"_check_lightning_invoice: checking invoice {invoice.payment_hash}"
             )
-            # todo check eth
-            status = 0
+
+            status = check_transfer(amount, invoice.payment_hash)
+
             logger.trace(
                 f"_check_lightning_invoice: invoice {invoice.payment_hash} status: {status}"
             )
-            if status == 1:
+            if status:
                 return True
             else:
                 raise Exception("Lightning invoice not paid yet.")

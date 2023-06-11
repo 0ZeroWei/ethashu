@@ -43,6 +43,7 @@ class CashuSettings(BaseSettings):
 class EnvSettings(CashuSettings):
     pk: str = Field(default=None)
     infura: str = Field(default=None)
+    alchemy: str = Field(default=None)
     debug: bool = Field(default=False)
     log_level: str = Field(default="INFO")
     host: str = Field(default="127.0.0.1")
