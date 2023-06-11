@@ -45,8 +45,6 @@ def main(
         "cashu.mint.app:app",
         port=port,
         host=host,
-        ssl_keyfile=ssl_keyfile,
-        ssl_certfile=ssl_certfile,
         **d,
     )
     server = uvicorn.Server(config)
