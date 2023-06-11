@@ -65,6 +65,23 @@ def create_app(config_object="core.settings") -> FastAPI:
 
     configure_logger()
 
+    # middleware = [
+    #     Middleware(
+    #         RawContextMiddleware,
+    #     ),
+    #     Middleware(CustomHeaderMiddleware),
+    # ]
+
+    middleware = [
+        Middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_methods=["*"],
+            allow_headers=["*"],
+            expose_headers=["*"],
+        )
+    ]
+
     app = FastAPI(
         title="Cashu Python Mint",
         description="Ecash wallet and mint for Bitcoin",
@@ -73,7 +90,10 @@ def create_app(config_object="core.settings") -> FastAPI:
             "name": "MIT License",
             "url": "https://raw.githubusercontent.com/cashubtc/cashu/main/LICENSE",
         },
+        middleware=middleware,
     )
+
+    # app.add_middleware(PyInstrumentProfilerMiddleware)
 
     return app
 
