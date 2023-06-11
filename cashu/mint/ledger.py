@@ -365,12 +365,13 @@ class Ledger:
             logger.trace(
                 f"_check_lightning_invoice: checking invoice {invoice.payment_hash}"
             )
-            status = await self.lightning.get_invoice_status(invoice.payment_hash)
+            # todo check eth
+            status = 0
             logger.trace(
                 f"_check_lightning_invoice: invoice {invoice.payment_hash} status: {status}"
             )
-            if status.paid:
-                return status.paid
+            if status == 1:
+                return True
             else:
                 raise Exception("Lightning invoice not paid yet.")
         except Exception as e:
@@ -608,24 +609,17 @@ class Ledger:
         if settings.mint_peg_out_only:
             raise Exception("Mint does not allow minting new tokens.")
 
-        logger.trace(f"requesting invoice for {amount} satoshis")
-        payment_request, payment_hash = await self._request_lightning_invoice(amount)
-        logger.trace(f"got invoice {payment_request} with hash {payment_hash}")
-        assert payment_request and payment_hash, Exception(
-            "could not fetch invoice from Lightning backend"
-        )
-
         invoice = Invoice(
             amount=amount,
             hash=random_hash(),
-            pr=payment_request,
-            payment_hash=payment_hash,  # what we got from the backend
+            pr="",
+            payment_hash=random_hash(),  # what we got from the backend
             issued=False,
         )
         logger.trace(f"crud: storing invoice {invoice.hash} in db")
         await self.crud.store_lightning_invoice(invoice=invoice, db=self.db)
         logger.trace(f"crud: stored invoice {invoice.hash} in db")
-        return payment_request, invoice.hash
+        return "", invoice.hash
 
     async def mint(
         self,
@@ -656,15 +650,14 @@ class Ledger:
             await conn.execute(lock_table(self.db, "invoices"))
             logger.trace("locked table invoice")
             # check if lightning invoice was paid
-            if settings.lightning:
-                if not hash:
-                    raise Exception("no hash provided.")
-                try:
-                    logger.trace("checking lightning invoice")
-                    paid = await self._check_lightning_invoice(amount, hash, conn)
-                    logger.trace(f"invoice paid: {paid}")
-                except Exception as e:
-                    raise e
+            if not hash:
+                raise Exception("no hash provided.")
+            try:
+                logger.trace("checking lightning invoice")
+                paid = await self._check_lightning_invoice(amount, hash, conn)
+                logger.trace(f"invoice paid: {paid}")
+            except Exception as e:
+                raise e
 
         for amount in amounts:
             if amount not in [2**i for i in range(settings.max_order)]:

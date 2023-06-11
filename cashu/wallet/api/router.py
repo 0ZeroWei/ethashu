@@ -110,12 +110,12 @@ async def invoice(
 
     global wallet
     wallet = await load_mint(wallet, mint)
-    if not settings.lightning:
-        r = await wallet.mint(amount, split=optional_split)
-        return InvoiceResponse(
-            amount=amount,
-        )
-    elif amount and not hash:
+    # if not settings.lightning:
+    #     r = await wallet.mint(amount, split=optional_split)
+    #     return InvoiceResponse(
+    #         amount=amount,
+    #     )
+    if amount and not hash:
         invoice = await wallet.request_mint(amount)
         return InvoiceResponse(
             amount=amount,
